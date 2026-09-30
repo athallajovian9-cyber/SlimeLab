@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Slime Maker & Trade</title>
+<style>
+  * { box-sizing: border-box; touch-action: manipulation; margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+  body { background: #121214; color: #fff; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+  header { padding: 12px; text-align: center; font-weight: bold; background: #1e1e24; border-bottom: 1px solid #333; }
+  main { flex: 1; display: flex; flex-direction: column; padding: 12px; gap: 10px; overflow-y: auto; }
+  .screen { display: none; flex-direction: column; gap: 10px; height: 100%; }
+  .active { display: flex; }
+  #bowl { flex: 1; background: #26262e; border-radius: 20px; display: flex; align-items: center; justify-content: center; position: relative; border: 3px dashed #444; overflow: hidden; user-select: none; }
+  #slime { width: 140px; height: 140px; border-radius: 50%; transition: transform 0.05s ease-out, border-radius 0.1s ease-out; background: #eee; box-shadow: 0 0 20px rgba(255,255,255,0.2); cursor: grab; }
+  #slime:active { cursor: grabbing; }
+  #mix-meter { width: 100%; height: 8px; background: #2a2a35; border-radius: 4px; overflow: hidden; margin-top: 4px; }
+  #mix-fill { height: 100%; width: 0%; background: #10b981; transition: width 0.1s ease; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  button { background: #3b82f6; border: none; color: #fff; padding: 12px; border-radius: 10px; font-weight: 600; cursor: pointer; }
+  button:active { transform: scale(0.96); }
+  .btn-sec { background: #374151; }
+  .btn-trade { background: #10b981; }
+  .btn-danger { background: #ef4444; }
+  .trade-box { display: flex; justify-content: space-around; align-items: center; background: #1e1e24; padding: 15px; border-radius: 12px; flex: 1; }
+  .slot { width: 100px; height: 100px; border-radius: 12px; background: #2a2a35; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 12px; gap: 6px; }
+  .trade-slime { width: 50px; height: 50px; border-radius: 50%; }
+  nav { display: flex; background: #1e1e24; border-top: 1px solid #333; }
+  nav button { flex: 1; border-radius: 0; background: transparent; padding: 14px; }
+  nav button.active-nav { background: #2d2d38; color: #60a5fa; }
+</style>
+</head>
+<body>
+
+<header id="title">Slime Lab</header>
+
+<main>
+  <!-- LAB -->
+  <section id="tab-lab" class="screen active">
+    <div id="bowl"><div id="slime"></div></div>
+    <div>
+      <div style="font-size: 12px; color: #aaa; text-align: center;" id="recipe">Ingredients: None</div>
+      <div id="mix-meter"><div id="mix-fill"></div></div>
+      <div style="font-size: 11px; color: #666; text-align: center; margin-top: 2px;" id="mix-label">Drag/swipe to mix</div>
+    </div>
+    <div class="grid">
+      <button class="btn-sec" onclick="add('glue', '#f8fafc', 0.2)">🧴 Glue</button>
+      <button class="btn-sec" onclick="add('soap', '#38bdf8', 0.15)">🧼 Soap</button>
+      <button class="btn-sec" onclick="add('shampoo', '#ec4899', 0.15)">🧴 Shampoo</button>
+      <button class="btn-sec" onclick="add('borax', '#22c55e', 0.25)">🧪 Borax</button>
+      <button class="btn-sec" onclick="add('glitter', '#eab308', 0.1)">✨ Glitter</button>
+      <button class="btn-danger" onclick="resetLab()">🗑️ Reset</button>
+    </div>
+    <button class="btn-trade" onclick="saveSlime()">Save to Inventory</button>
+  </section>
+
+  <!-- TRADE -->
+  <section id="tab-trade" class="screen">
+    <div style="font-size: 13px; color: #aaa; text-align: center;">Target Trader: <span id="trader-name">Bot Emma</span></div>
+    <div class="trade-box">
+      <div class="slot">
+        <span>You</span>
+        <div id="my-offer" class="trade-slime"></div>
+        <span id="my-name">Empty</span>
+      </div>
+      <span style="font-weight: bold;">⇄</span>
+      <div class="slot">
+        <span>Partner</span>
+        <div id="partner-offer" class="trade-slime"></div>
+        <span id="partner-name">...</span>
+      </div>
+    </div>
+    <div id="trade-msg" style="text-align: center; font-size: 13px; min-height: 18px;">Pick a slime to trade</div>
+    <div class="grid">
+      <button class="btn-trade" id="accept-btn" onclick="deal(true)" disabled>Accept</button>
+      <button class="btn-danger" id="decline-btn" onclick="deal(false)" disabled>Decline</button>
+    </div>
+    <div style="font-size: 12px; margin-top: 6px;">Your Slimes:</div>
+    <div id="inv-list" class="grid" style="grid-template-columns: repeat(4, 1fr); max-height: 120px; overflow-y: auto;"></div>
+  </section>
+</main>
+
+<nav>
+  <button id="btn-tab-lab" class="active-nav" onclick="tab('lab')">Create</button>
+  <button id="btn-tab-trade" onclick="tab('trade')">Trade</button>
+</nav>
+
+<script>
+// ponytail: local memory state only. Add persistent backend/WebRTC when multiplayer needed.
+const state = {
+  mix: [],
+  color: [240, 240, 240],
+  firm: 1,
+  inv: [{ name: 'Starter Putty', col: '#93c5fd', mix: ['glue', 'borax'] }],
+  selTrade: null,
+  partner: null
+};
+
+const BOTS = ['Maya', 'Alex', 'Liam', 'Zoe'];
+const COLORS = { glue: [255,255,255], soap: [56,189,248], shampoo: [236,72,153], borax: [34,197,94], glitter: [234,179,8] };
+
+function add(item, hex, firmInc) {
+  state.mix.push(item);
+  state.firm += firmInc;
+  const c = COLORS[item];
+  state.color = state.color.map((v, i) => Math.round(v * 0.6 + c[i] * 0.4));
+  const el = document.getElementById('slime');
+  el.style.backgroundColor = `rgb(${state.color.join(',')})`;
+  el.style.borderRadius = `${40 + Math.random()*20}% ${50 + Math.random()*20}% ${40 + Math.random()*20}% ${50 + Math.random()*20}%`;
+  el.style.transform = `scale(${Math.min(1.4, 0.8 + state.mix.length * 0.05)})`;
+  document.getElementById('recipe').innerText = `Ingredients: ${state.mix.join(', ')}`;
+}
+
+function resetLab() {
+  state.mix = [];
+  state.color = [240, 240, 240];
+  state.firm = 1;
+  const el = document.getElementById('slime');
+  el.style.backgroundColor = '#eee';
+  el.style.transform = 'scale(1)';
+  document.getElementById('recipe').innerText = 'Ingredients: None';
+}
+
+function saveSlime() {
+  if (!state.mix.length) return alert('Mix ingredients first.');
+  const col = `rgb(${state.color.join(',')})`;
+  state.inv.push({ name: `Slime #${state.inv.length + 1}`, col, mix: [...state.mix] });
+  resetLab();
+  tab('trade');
+}
+
+function tab(t) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active-nav'));
+  document.getElementById(`tab-${t}`).classList.add('active');
+  document.getElementById(`btn-tab-${t}`).classList.add('active-nav');
+  document.getElementById('title').innerText = t === 'lab' ? 'Slime Lab' : 'Trade Market';
+  if (t === 'trade') renderTrade();
+}
+
+function renderTrade() {
+  const list = document.getElementById('inv-list');
+  list.innerHTML = '';
+  state.inv.forEach((s, i) => {
+    const b = document.createElement('button');
+    b.className = 'btn-sec';
+    b.style.border = state.selTrade === i ? '2px solid #60a5fa' : 'none';
+    b.innerHTML = `<div style="width:20px;height:20px;border-radius:50%;background:${s.col};margin:0 auto 4px;"></div><span style="font-size:10px;">${s.name}</span>`;
+    b.onclick = () => selectForTrade(i);
+    list.appendChild(b);
+  });
+}
+
+function selectForTrade(i) {
+  state.selTrade = i;
+  const s = state.inv[i];
+  document.getElementById('my-offer').style.backgroundColor = s.col;
+  document.getElementById('my-name').innerText = s.name;
+
+  // Bot response logic
+  const botName = BOTS[Math.floor(Math.random() * BOTS.length)];
+  document.getElementById('trader-name').innerText = botName;
+  const partnerSlime = {
+    name: `${botName}'s Slime`,
+    col: `hsl(${Math.floor(Math.random()*360)}, 70%, 60%)`,
+    mix: ['glue', 'mystery']
+  };
+  state.partner = partnerSlime;
+  document.getElementById('partner-offer').style.backgroundColor = partnerSlime.col;
+  document.getElementById('partner-name').innerText = partnerSlime.name;
+
+  const willAccept = s.mix.length >= 2 || Math.random() > 0.4;
+  document.getElementById('trade-msg').innerText = willAccept ? `${botName} is interested in trading.` : `${botName} looks unimpressed.`;
+  document.getElementById('accept-btn').disabled = !willAccept;
+  document.getElementById('decline-btn').disabled = false;
+  renderTrade();
+}
+
+function deal(accepted) {
+  if (accepted && state.selTrade !== null && state.partner) {
+    state.inv.splice(state.selTrade, 1);
+    state.inv.push(state.partner);
+    document.getElementById('trade-msg').innerText = 'Trade completed.';
+  } else {
+    document.getElementById('trade-msg').innerText = 'Trade cancelled.';
+  }
+  state.selTrade = null;
+  state.partner = null;
+  document.getElementById('my-offer').style.backgroundColor = 'transparent';
+  document.getElementById('partner-offer').style.backgroundColor = 'transparent';
+  document.getElementById('my-name').innerText = 'Empty';
+  document.getElementById('partner-name').innerText = '...';
+  document.getElementById('accept-btn').disabled = true;
+  document.getElementById('decline-btn').disabled = true;
+  renderTrade();
+}
+</script>
+</body>
+</html>

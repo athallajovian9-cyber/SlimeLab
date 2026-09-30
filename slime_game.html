@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Slime Lab</title>
+<style>
+  :root{
+    --bg:#0d1014; --panel:#171c23; --panel2:#11151a; --line:#252c36;
+    --fg:#e9eef5; --dim:#8b97a6; --acc:#5aa9ff; --gold:#ffcc55;
+    --good:#22c98a; --bad:#ff5f56;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+    -webkit-tap-highlight-color:transparent}
+  body{background:var(--bg);color:var(--fg);display:flex;flex-direction:column;
+    height:100vh;height:100dvh;overflow:hidden;user-select:none}
+  header{padding:9px 13px;display:flex;justify-content:space-between;align-items:center;
+    background:var(--panel);border-bottom:1px solid var(--line);flex-shrink:0}
+  header h1{font-size:14px;letter-spacing:.02em}
+  header h1 span{color:var(--dim);font-weight:400;font-size:11.5px;margin-left:7px}
+  #coins{font-weight:700;color:var(--gold);font-size:14.5px;font-variant-numeric:tabular-nums}
+  main{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:9px;
+    -webkit-overflow-scrolling:touch}
+  .screen{display:none;flex-direction:column;gap:9px;flex:1;min-height:0}
+  .screen.active{display:flex}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:11px}
+  .h{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin-bottom:7px}
+  .h .tag{float:right;text-transform:none;letter-spacing:0;color:var(--acc)}
+
+  /* ------------------------------ the bowl ------------------------------ */
+  #bowlWrap{flex:1;min-height:210px;position:relative;border-radius:16px;overflow:hidden;
+    border:1px solid var(--line);background:#0a0d11}
+  #cv{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+  #cv:active{cursor:grabbing}
+  #behaviour{position:absolute;left:10px;bottom:8px;font-size:11px;color:var(--dim);
+    pointer-events:none;text-shadow:0 1px 3px #000}
+  #mixOverlay{position:absolute;right:10px;top:8px;font-size:10.5px;color:var(--dim);
+    pointer-events:none;text-align:right;text-shadow:0 1px 3px #000}
+  #mixOverlay b{color:var(--acc)}
+
+  #mixwrap{display:flex;align-items:center;gap:8px}
+  #mix-meter{flex:1;height:8px;background:var(--panel2);border-radius:4px;overflow:hidden;
+    border:1px solid var(--line)}
+  #mix-fill{height:100%;width:0%;background:linear-gradient(90deg,#2b7fff,#22c98a);
+    transition:width .08s linear}
+  #mixPct{font-size:11px;color:var(--dim);width:36px;text-align:right;
+    font-variant-numeric:tabular-nums}
+
+  /* ------------------------------ readouts ------------------------------ */
+  .bars{display:grid;grid-template-columns:1fr 1fr;gap:5px 12px}
+  .bar{display:grid;grid-template-columns:66px 1fr 30px;gap:7px;align-items:center;font-size:11px}
+  .bar .t{color:var(--dim)}
+  .bar .g{height:7px;background:var(--panel2);border-radius:4px;overflow:hidden}
+  .bar .g i{display:block;height:100%;background:var(--acc);border-radius:4px;transition:width .15s}
+  .bar .v{text-align:right;color:var(--dim);font-variant-numeric:tabular-nums;font-size:10.5px}
+  .bar.mat .g i{background:#7f6bff}
+  .bar.sell .g i{background:var(--good)}
+
+  button{background:var(--panel);border:1px solid var(--line);color:var(--fg);padding:10px 7px;
+    border-radius:10px;font-weight:600;font-size:12.5px;cursor:pointer;
+    transition:transform .07s,border-color .15s}
+  button:hover{border-color:var(--acc)}
+  button:active{transform:scale(.96)}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  button:disabled:hover{border-color:var(--line)}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .ing{display:flex;flex-direction:column;gap:2px;align-items:center}
+  .ing .em{font-size:16px;line-height:1}
+  .ing .nm{font-size:10.5px}
+  .ing .ct{font-size:9.5px;color:var(--gold);font-weight:400}
+  .ing .ct.poor{color:var(--bad)}
+  .row{display:flex;gap:6px}
+  .row button{flex:1}
+  .btn-go{background:var(--acc);border-color:var(--acc);color:#04121f}
+  .btn-good{background:var(--good);border-color:var(--good);color:#04121f}
+  .btn-bad{color:var(--bad)}
+  #msg{text-align:center;font-size:12px;color:var(--dim);min-height:30px;padding:3px}
+  #msg.ok{color:var(--good)} #msg.no{color:var(--bad)} #msg.warn{color:var(--gold)}
+  .muted{color:var(--dim);font-size:11.5px;text-align:center;padding:7px}
+
+  #inv{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:6px;
+    max-height:140px;overflow-y:auto}
+  .chip{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:7px 4px;
+    text-align:center;cursor:pointer}
+  .chip.on{border-color:var(--acc);background:rgba(90,169,255,.1)}
+  .chip .dot{width:32px;height:32px;border-radius:46% 54% 48% 52%;margin:0 auto 4px;
+    box-shadow:inset -5px -6px 11px rgba(0,0,0,.3),inset 4px 5px 9px rgba(255,255,255,.26)}
+  .chip .nm{font-size:9.5px;color:var(--dim);line-height:1.2;overflow:hidden;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .chip .vl{font-size:10px;color:var(--gold);font-weight:700}
+
+  .trader{display:flex;gap:9px;align-items:center;padding:9px;border-radius:10px;
+    background:var(--panel2);border:1px solid var(--line);margin-bottom:6px;cursor:pointer}
+  .trader.on{border-color:var(--acc)}
+  .trader .av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;
+    justify-content:center;font-weight:700;flex-shrink:0;color:#0b0e12}
+  .trader .nm{font-weight:700;font-size:12.5px}
+  .trader .bl{font-size:10.5px;color:var(--dim)}
+  .trader .of{margin-left:auto;text-align:right;flex-shrink:0}
+  .trader .of .c{font-weight:700;color:var(--gold);font-size:13px;font-variant-numeric:tabular-nums}
+  .trader .of .s{font-size:9.5px;color:var(--dim)}
+
+  .swap{display:flex;gap:8px;align-items:stretch}
+  .side{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+    padding:8px;text-align:center;min-width:0}
+  .side .lbl{font-size:9.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+  .side .blob{width:44px;height:44px;border-radius:46% 54% 48% 52%;margin:6px auto}
+  .side .nm{font-size:10.5px;min-height:24px;line-height:1.2}
+  .side .vl{font-size:11.5px;color:var(--gold);font-weight:700}
+  .arrow{display:flex;align-items:center;color:var(--dim);font-size:17px}
+
+  nav{display:flex;background:var(--panel);border-top:1px solid var(--line);flex-shrink:0;
+    padding-bottom:env(safe-area-inset-bottom)}
+  nav button{flex:1;border:none;border-radius:0;background:transparent;padding:12px 5px;
+    font-size:11.5px;color:var(--dim)}
+  nav button.on{color:var(--acc);box-shadow:inset 0 -2px 0 var(--acc)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Slime Lab <span id="subtitle">mix a batch</span></h1>
+  <div id="coins">&#9672; 120</div>
+</header>
+
+<main>
+  <!-- ============================ LAB ============================ -->
+  <section id="tab-lab" class="screen active">
+    <div id="bowlWrap">
+      <canvas id="cv"></canvas>
+      <div id="mixOverlay">mixed <b id="mixPct">0%</b></div>
+      <div id="behaviour">drag the slime to mix it</div>
+    </div>
+
+    <div class="card" style="padding:9px 11px">
+      <div id="mixwrap">
+        <span style="font-size:10px;color:var(--dim)">MIX</span>
+        <div id="mix-meter"><div id="mix-fill"></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="h">Material <span class="tag" id="matTag">how it behaves</span></div>
+      <div class="bars" id="matBars"></div>
+    </div>
+
+    <div class="card">
+      <div class="h">Worth selling as <span class="tag" id="nameTag">—</span></div>
+      <div class="bars" id="statBars"></div>
+      <div id="value" style="text-align:center;font-size:11.5px;color:var(--dim);
+        margin-top:8px;padding-top:7px;border-top:1px solid var(--line)"></div>
+    </div>
+
+    <div class="grid3" id="ingredients"></div>
+    <div class="row">
+      <button id="saveBtn" class="btn-good">Save to Inventory</button>
+      <button id="resetBtn" class="btn-bad" style="flex:0 0 84px">Dump</button>
+    </div>
+  </section>
+
+  <!-- =========================== TRADERS =========================== -->
+  <section id="tab-trade" class="screen">
+    <div class="card">
+      <div class="h">Sell to a trader</div>
+      <div id="traders"></div>
+    </div>
+    <div class="card">
+      <div class="h">Your slimes</div>
+      <div id="inv"></div>
+      <div id="invEmpty" class="muted">Nothing made yet.</div>
+    </div>
+    <div class="card" id="dealCard" style="display:none">
+      <div class="h">The deal</div>
+      <div class="swap">
+        <div class="side"><div class="lbl">You give</div>
+          <div class="blob" id="myBlob"></div>
+          <div class="nm" id="myName">—</div><div class="vl" id="myVal">—</div></div>
+        <div class="arrow">&#8644;</div>
+        <div class="side"><div class="lbl" id="theirLbl">They pay</div>
+          <div class="blob" id="theirBlob"></div>
+          <div class="nm" id="theirName">coins</div><div class="vl" id="theirVal">—</div></div>
+      </div>
+      <div id="msg">Pick a slime, then pick who to sell to.</div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn-go" id="acceptBtn" disabled>Accept</button>
+        <button id="counterBtn" disabled>Ask more</button>
+        <button class="btn-bad" id="declineBtn" disabled>Walk</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button id="nav-lab" class="on">Lab</button>
+  <button id="nav-trade">Traders</button>
+</nav>
+
+<script>/* =====================================================================
+   SLIME — the model.
+
+   DOM-free, so every rule here is directly testable in Node.
+
+   The structure is:
+
+       recipe  --[ MIX MATRIX ]-->  material properties
+                                        |
+                                        +--> drives the SOFT-BODY SIMULATION
+                                        +--> drives the SELLABLE STATS
+
+   Both outputs come from the same numbers on purpose. What you watch jiggle
+   is what you sell: if the blob on screen is springy, the slime is worth
+   money to the trader who wants bounce, and the screen and the price tag
+   cannot disagree.
+
+   The matrix is a linear mixture model, which is how real mixtures are
+   approximated: each ingredient contributes to each property in proportion
+   to how much of it is present.
+   ===================================================================== */
+'use strict';
+
+/* ------------------------------------------------------------ ingredients
+
+   `vec` is this ingredient's column in the mix matrix: how it pushes each
+   material property. The signs are the whole design - borax stiffens,
+   shampoo softens and slows, soap lightens and aerates.
+*/
+const INGREDIENTS = {
+  glue: {
+    name: 'PVA Glue', emoji: '\u{1F9F4}', cost: 6, colour: [248, 250, 252],
+    vec: { stiffness: 1.00, damping: 0.60, pressure: 1.35, density: 1.80, size: 1.50, flow: -0.30, aeration: 0.00 },
+    note: 'the base. adds mass and body.',
+  },
+  borax: {
+    name: 'Borax', emoji: '\u{1F9EA}', cost: 9, colour: [34, 197, 94],
+    vec: { stiffness: 3.00, damping: 1.80, pressure: 1.55, density: 0.40, size: 0.15, flow: -0.85, aeration: 0.00 },
+    note: 'activates it. tighter springs - snaps back and jiggles.',
+  },
+  shampoo: {
+    name: 'Shampoo', emoji: '\u{1F9F4}', cost: 7, colour: [236, 72, 153],
+    vec: { stiffness: -0.85, damping: -2.00, pressure: -0.45, density: 0.05, size: 0.30, flow: 2.20, aeration: 0.15 },
+    note: 'softens it. slower, stretchier, more liquid.',
+  },
+  soap: {
+    name: 'Hand Soap', emoji: '\u{1F9FC}', cost: 5, colour: [56, 189, 248],
+    vec: { stiffness: -0.30, damping: -0.20, pressure: 0.55, density: -1.25, size: 0.95, flow: 0.85, aeration: 1.70 },
+    note: 'aerates it. foam bubbles, and lighter.',
+  },
+  toner: {
+    name: 'Toner', emoji: '\u{1F4A7}', cost: 4, colour: [186, 230, 253],
+    vec: { stiffness: -0.50, damping: -1.00, pressure: -0.30, density: -0.20, size: 0.20, flow: 1.45, aeration: 0.05 },
+    note: 'thins it out. runs like water if you overdo it.',
+  },
+  glitter: {
+    name: 'Glitter', emoji: '\u{2728}', cost: 10, colour: [234, 179, 8],
+    vec: { stiffness: 0.10, damping: 0.10, pressure: 0.10, density: 0.65, size: 0.10, flow: 0.00, aeration: 0.00 },
+    note: 'does nothing to how it moves. only what it is worth.',
+  },
+};
+
+const INGREDIENT_ORDER = ['glue', 'borax', 'shampoo', 'soap', 'toner', 'glitter'];
+
+/** The properties the matrix produces. */
+const MATERIALS = ['stiffness', 'damping', 'pressure', 'density', 'size', 'flow', 'aeration'];
+const MATERIAL_LABEL = {
+  stiffness: 'Stiffness', damping: 'Viscosity', pressure: 'Elasticity',
+  density: 'Density', size: 'Mass', flow: 'Fluidity', aeration: 'Aeration',
+};
+
+/** The five things a trader will pay for. */
+const STATS = ['bounce', 'stretch', 'body', 'shine', 'sparkle'];
+const STAT_LABEL = {
+  bounce: 'Bounce', stretch: 'Stretch', body: 'Body',
+  shine: 'Shine', sparkle: 'Sparkle',
+};
+
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+
+/* --------------------------------------------------------- the mix matrix
+
+   Normalised ingredient fractions multiplied by each ingredient's column.
+*/
+function rawMaterial(recipe) {
+  let total = 0;
+  for (const k of Object.keys(recipe)) if (recipe[k] > 0) total += recipe[k];
+  const out = {};
+  for (const m of MATERIALS) out[m] = 0;
+  if (total <= 0) return { material: out, total: 0 };
+
+  for (const k of Object.keys(recipe)) {
+    const n = recipe[k];
+    if (!(n > 0)) continue;
+    const ing = INGREDIENTS[k];
+    if (!ing) continue;
+    const w = n / total;
+    for (const m of MATERIALS) out[m] += ing.vec[m] * w;
+  }
+  return { material: out, total };
+}
+
+/* --------------------------------------------------------------- chemistry
+
+   Borax activates the polymer. Below a threshold it never sets; above a much
+   higher one it over-sets and goes brittle. Both are failures, so the working
+   window is narrow - the interesting part of the recipe rather than a bonus.
+*/
+function activation(recipe) {
+  let total = 0, borax = 0;
+  for (const k of Object.keys(recipe)) {
+    const n = recipe[k];
+    if (!(n > 0)) continue;
+    total += n;
+    if (k === 'borax') borax += n;
+  }
+  if (borax === 0) return 0.25;
+  const ratio = borax / total;
+  if (ratio < 0.08) return 0.55;
+  if (ratio <= 0.45) return 1.0;
+  return Math.max(0.35, 1.0 - (ratio - 0.45) * 2.2);
+}
+
+/** Mixing effort, 0..1. An unmixed batch keeps only about a third. */
+function mixQuality(mix) {
+  return 0.35 + 0.65 * clamp(mix, 0, 1);
+}
+
+/* ------------------------------------------------------ material mapping
+
+   Raw matrix output -> the numbers the simulation uses. Each is clamped into
+   a range the renderer can rely on, so a silly recipe produces extreme slime
+   rather than a broken simulation.
+*/
+const RANGES = {
+  stiffness: [0.04, 1.00],
+  damping:   [0.905, 0.998],   // velocity retained per step: higher = runnier
+  pressure:  [0.15, 3.20],
+  density:   [0.35, 2.60],
+  size:      [0.55, 2.40],
+  flow:      [0.00, 1.00],
+  aeration:  [0.00, 1.00],
+};
+
+/* Properties where zero means "none of it". These are mapped from the raw value
+   upward instead of being centred on the middle of their range - otherwise a batch
+   with no soap at all still lands mid-range and comes out foamy. */
+const ABSOLUTE = { aeration: true };
+
+/* How large a raw matrix value is meaningful. The weighted sums land around +/-1.5,
+   so dividing by this uses most of each property's range instead of a sliver of it -
+   the first version used about a sixth, which is why the slime barely changed. */
+const V_SPAN = 1.5;
+
+function materialFromRecipe(recipe, mix) {
+  const { material, total } = rawMaterial(recipe);
+  const act = activation(recipe);
+  const mq = mixQuality(mix);
+
+  const out = {};
+  if (total <= 0) {
+    for (const m of MATERIALS) out[m] = RANGES[m][0];
+    out.size = 0.8;
+    out.damping = 0.96;
+    out.bubbles = 0;
+    return out;
+  }
+
+  for (const m of MATERIALS) {
+    let v = material[m];
+    // activation gates the elastic behaviour: a batch that never set behaves
+    // like wet glue no matter what else went in
+    if (m === 'stiffness' || m === 'pressure') v *= 0.25 + 0.75 * act;
+    if (m === 'damping' || m === 'flow') v *= 0.60 + 0.40 * act;
+    if (m === 'aeration') v *= 0.40 + 0.60 * act;
+    // mixing always helps: unmixed batches behave unevenly
+    if (m === 'stiffness' || m === 'pressure') v *= 0.5 + 0.5 * mq;
+
+    const lo = RANGES[m][0], hi = RANGES[m][1];
+    if (ABSOLUTE[m]) {
+      // zero raw value must mean zero, not the middle of the range
+      out[m] = clamp(lo + (v / V_SPAN) * (hi - lo), lo, hi);
+    } else {
+      const ref = (lo + hi) / 2, spread = (hi - lo) / 2;
+      out[m] = clamp(ref + (v / V_SPAN) * spread, lo, hi);
+    }
+  }
+
+  // more mass should simply make it bigger: "more glue = more slime" is the
+  // clearest signal in the game and should not be subtle
+  // MASS. Every property above comes from the COMPOSITION, so a big batch of the
+  // same recipe behaved identically to a small one - adding more glue changed
+  // nothing, which is plainly wrong. Size is where the absolute amount belongs:
+  // more ingredients means more slime. Composition only nudges it, and only via
+  // aeration, because foam takes up room.
+  out.mass = total;
+  out.size = clamp(0.52 + 0.19 * total + 0.30 * out.aeration,
+                   RANGES.size[0], RANGES.size[1]);
+  out.bubbles = Math.round(out.aeration * 30);
+  return out;
+}
+
+/* ----------------------------------------------------- physics parameters
+
+   Material -> the numbers the soft-body simulation runs on. Kept here, in the
+   DOM-free model, so the translation is testable: the renderer cannot quietly
+   decide that stiffness means something else.
+
+   `viewR` is how many pixels a size of 1.0 occupies in the bowl.
+*/
+function simParams(mat, viewR) {
+  const r = viewR == null ? 100 : viewR;
+  return {
+    restR: r * mat.size,
+    // spring constant: how hard the perimeter pulls itself back to round
+    k: 0.08 + 0.42 * mat.stiffness,
+    // velocity retained per step: high = snappy, low = sluggish
+    retention: clamp(mat.damping, 0.80, 0.999),
+    // internal pressure: volume preservation, which is what makes it jiggle
+    pressure: mat.pressure,
+    // how much shape memory it has: a fluid slime barely pulls itself round again
+    flow: mat.flow,
+    // heavier slime falls harder and resists being dragged
+    gravity: 0.20 * mat.density,
+    grip: clamp(1.25 / mat.density, 0.35, 2.4),
+    bubbles: mat.bubbles,
+    size: mat.size,
+  };
+}
+
+/* ---------------------------------------------------- stats from material
+
+   The sellable stats are the material properties restated in plain words.
+   Same numbers as the simulation, so the slime on screen and the slime on
+   the price tag cannot disagree.
+*/
+function statsFromMaterial(mat) {
+  const norm = (m) => {
+    const lo = RANGES[m][0], hi = RANGES[m][1];
+    return clamp((mat[m] - lo) / (hi - lo), 0, 1);
+  };
+  const bounce = norm('pressure') * 0.65 + norm('stiffness') * 0.35;
+  const stretch = norm('flow') * 0.70 + (1 - norm('stiffness')) * 0.30;
+  const body = norm('density') * 0.70 + norm('size') * 0.30;
+  return {
+    bounce: round2(bounce * 5.5),
+    stretch: round2(stretch * 5.5),
+    body: round2(body * 5.5),
+    shine: 0,      // filled from the recipe below: a surface property
+    sparkle: 0,
+  };
+}
+
+/** Full stats: material-derived, plus the two that come from the recipe. */
+/* Yield: a bigger batch is more slime. Saturating, so ten times the ingredients is
+   not ten times the money - but a large batch is worth more than a small one. */
+function yieldFactor(total) {
+  return 0.70 + 0.80 * (1 - Math.exp(-total / 7));
+}
+
+function computeStats(recipe, mix) {
+  const mat = materialFromRecipe(recipe, mix);
+  const st = statsFromMaterial(mat);
+  const mq = mixQuality(mix);
+  const act = activation(recipe);
+
+  let shine = 0, sparkle = 0, n = 0;
+  for (const k of Object.keys(recipe)) {
+    const c = recipe[k];
+    if (!(c > 0)) continue;
+    n += c;
+    if (k === 'shampoo') shine += 2.6 * c;
+    if (k === 'glitter') { sparkle += 3.0 * c; shine += 0.8 * c; }
+    if (k === 'soap') shine += 0.5 * c;
+  }
+  const t = Math.max(1, n);
+  st.shine = round2(Math.max(0, 5.5 * Math.tanh((shine / t) * 2.2) * act * mq));
+  st.sparkle = round2(Math.max(0, 5.5 * Math.tanh((sparkle / t) * 2.2)));
+
+  // apply yield to the material-derived stats, so a bigger batch of the same recipe
+  // earns more without changing what it is like to handle
+  const yf = yieldFactor(Object.keys(recipe).reduce((a, k) => a + (recipe[k] > 0 ? recipe[k] : 0), 0));
+  for (const s of ['bounce', 'stretch', 'body']) st[s] = round2(Math.min(6, st[s] * yf));
+  st.shine = round2(Math.min(6, st.shine * yf));
+  st.sparkle = round2(Math.min(6, st.sparkle * yf));
+  return st;
+}
+
+/** Colour, blended by how much of each ingredient is present. */
+function computeColour(recipe) {
+  let r = 240, g = 240, b = 240, w = 1;
+  for (const key of Object.keys(recipe)) {
+    const n = recipe[key];
+    if (!(n > 0)) continue;
+    const c = INGREDIENTS[key].colour;
+    r += (c[0] - r) * (n / (w + n));
+    g += (c[1] - g) * (n / (w + n));
+    b += (c[2] - b) * (n / (w + n));
+    w += n;
+  }
+  return [Math.round(clamp(r, 0, 255)), Math.round(clamp(g, 0, 255)), Math.round(clamp(b, 0, 255))];
+}
+
+/* --------------------------------------------------------------- valuation */
+function valueOf(stats, opts) {
+  opts = opts || {};
+  const vals = STATS.map(s => Math.max(0, stats[s] || 0));
+  const sum = vals.reduce((a, b) => a + b, 0);
+  if (sum <= 0) return 0;
+  const mean = sum / vals.length;
+  const sd = Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length);
+  const balance = clamp(1 - (sd / (mean + 0.001)) * 0.9, 0.45, 1.0);
+  const diversity = 1 + 0.09 * Math.max(0, (opts.distinct || 1) - 1);
+  const peak = Math.max.apply(null, vals);
+  const base = sum * 1.6 + peak * 2.2;
+  return Math.max(0, Math.round(base * balance * diversity * (opts.mult || 1)));
+}
+
+/* --------------------------------------------------------------- traders */
+const TRADERS = [
+  { id: 'maya', name: 'Maya', blurb: 'only buys things that sparkle',
+    wants: { sparkle: 2.6, shine: 1.6, stretch: 0.5, bounce: 0.4, body: 0.4 },
+    patience: 2, coins: 260 },
+  { id: 'alex', name: 'Alex', blurb: 'stretch tests everything',
+    wants: { stretch: 2.8, bounce: 0.8, body: 0.9, shine: 0.3, sparkle: 0.3 },
+    patience: 3, coins: 300 },
+  { id: 'liam', name: 'Liam', blurb: 'bounces them off the ceiling',
+    wants: { bounce: 2.9, body: 1.4, stretch: 0.6, shine: 0.3, sparkle: 0.2 },
+    patience: 2, coins: 240 },
+  { id: 'zoe', name: 'Zoe', blurb: 'buys by the pound',
+    wants: { body: 3.0, shine: 1.0, bounce: 0.7, stretch: 0.5, sparkle: 0.5 },
+    patience: 3, coins: 280 },
+];
+
+function traderOffer(trader, stats, distinct) {
+  let weighted = 0;
+  for (const s of STATS) weighted += (stats[s] || 0) * (trader.wants[s] || 0);
+  const base = valueOf(stats, { distinct: distinct || 1 });
+  return { coins: Math.max(0, Math.round((weighted * 3.1 + base * 0.55) / 5) * 5), weighted };
+}
+
+function acceptsCounter(trader, stats, want, countersLeft, distinct) {
+  if (countersLeft <= 0) return false;
+  const fair = traderOffer(trader, stats, distinct).coins;
+  if (fair <= 0) return false;
+  return want / fair <= 1.10 + 0.06 * countersLeft;
+}
+
+function makeIncoming(trader, theirStats, seed) {
+  const rnd = mulberry(seed);
+  const offered = {};
+  for (const s of STATS) {
+    offered[s] = round2(Math.max(0, (theirStats[s] || 0) * (0.75 + rnd() * 0.6)));
+  }
+  return {
+    from: trader.id, stats: offered,
+    colour: `hsl(${Math.floor(rnd() * 360)}, ${45 + Math.floor(rnd() * 35)}%, ${45 + Math.floor(rnd() * 25)}%)`,
+    wanted: round2(20 + rnd() * 60),
+  };
+}
+
+/* ---------------------------------------------------------- rng + naming */
+function mulberry(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const round2 = v => Math.round(v * 100) / 100;
+
+/** How the material behaves, in words - shown next to the sim. */
+function describeMaterial(mat) {
+  const words = [];
+  const mid = (m) => (mat[m] - RANGES[m][0]) / (RANGES[m][1] - RANGES[m][0]);
+  if (mid('pressure') > 0.66) words.push('very elastic');
+  else if (mid('pressure') < 0.33) words.push('dead');
+  if (mid('flow') > 0.66) words.push('runny');
+  else if (mid('flow') < 0.33) words.push('firm');
+  if (mid('density') > 0.66) words.push('heavy');
+  else if (mid('density') < 0.33) words.push('light');
+  if (mat.aeration > 0.5) words.push('foamy');
+  return words.length ? words.join(', ') : 'unremarkable';
+}
+
+function nameFromRecipe(recipe, stats) {
+  const present = Object.keys(recipe).filter(k => recipe[k] > 0);
+  if (!present.length) return 'Empty Blob';
+  const top = STATS.slice().sort((a, b) => (stats[b] || 0) - (stats[a] || 0))[0];
+  const peak = stats[top] || 0;
+  const adj = peak > 3.4 ? 'Prime' : peak > 2.2 ? 'Good' : peak > 1.2 ? 'Fair' : 'Weak';
+  const flavour = {
+    bounce: 'Bouncy', stretch: 'Stretchy', body: 'Dense',
+    shine: 'Glossy', sparkle: 'Glittering',
+  }[top];
+  if (present.length === 1) return `${adj} ${INGREDIENTS[present[0]].name} Blob`;
+  return `${adj} ${flavour} Slime`;
+}
+
+/* ------------------------------------------------------------- persistence */
+function serialise(state) {
+  return JSON.stringify({
+    v: 2,                       // the material model replaced v1
+    coins: state.coins,
+    inv: (state.inv || []).map(s => ({
+      name: s.name, stats: s.stats, colour: s.colour,
+      recipe: s.recipe, mix: s.mix, value: s.value,
+      material: s.material || null,
+    })),
+    made: state.made,
+    sold: state.sold,
+  });
+}
+
+function deserialise(text) {
+  try {
+    const o = JSON.parse(text);
+    // v1 saves are still readable: the inventory shape did not change
+    if (!o || (o.v !== 1 && o.v !== 2)) return null;
+    return {
+      coins: Number.isFinite(o.coins) ? o.coins : 120,
+      inv: Array.isArray(o.inv) ? o.inv.filter(s => s && s.stats && s.colour) : [],
+      made: Number.isFinite(o.made) ? o.made : 0,
+      sold: Number.isFinite(o.sold) ? o.sold : 0,
+    };
+  } catch (e) { return null; }
+}
+
+/* Exported for the tests; ignored in the browser. */
+if (typeof module === 'object' && module.exports) {
+  module.exports = {
+    INGREDIENTS, INGREDIENT_ORDER, MATERIALS, MATERIAL_LABEL, STATS, STAT_LABEL,
+    RANGES, TRADERS,
+    rawMaterial, activation, mixQuality, materialFromRecipe, statsFromMaterial, simParams,
+    computeStats, computeColour, valueOf, traderOffer, acceptsCounter,
+    makeIncoming, mulberry, round2, describeMaterial, nameFromRecipe,
+    serialise, deserialise, clamp,
+  };
+}
+
+/* ---- namespace so the game can call into the tested model ---- */
+const CORE = {
+  INGREDIENTS, INGREDIENT_ORDER, MATERIALS, MATERIAL_LABEL, STATS, STAT_LABEL,
+  RANGES, TRADERS,
+  rawMaterial, activation, mixQuality, materialFromRecipe, statsFromMaterial,
+  simParams, computeStats, computeColour, valueOf, traderOffer, acceptsCounter,
+  makeIncoming, mulberry, round2, describeMaterial, nameFromRecipe,
+  serialise, deserialise, clamp,
+};
+</script>
+<script>
+'use strict';
+
+/* =====================================================================
+   The game.
+
+   The blob is a real soft body: a ring of particles under gravity, joined
+   by perimeter and radial springs, held open by internal pressure, and
+   pushed around by the pointer. Every number it runs on comes from
+   CORE.simParams(material), so the chemistry is felt rather than displayed.
+   ===================================================================== */
+
+const SAVE_KEY = 'slime.v2';
+const START_COINS = 120;
+const TAU = Math.PI * 2;
+
+/* ======================================================== soft body */
+class Blob {
+  constructor(n) {
+    this.n = n;
+    this.p = [];
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * TAU;
+      this.p.push({ x: 0, y: 0, px: 0, py: 0 });
+    }
+    this.centre = { x: 0, y: 0 };
+    this.area0 = 0;
+  }
+
+  /** `r` is the resting radius at the CURRENT size; `areaBase` is the radius at
+   *  size 1.0. They are different numbers and conflating them is what left the blob
+   *  contracting forever: the pressure term already multiplies by size squared. */
+  reset(cx, cy, r, areaBase) {
+    for (let i = 0; i < this.n; i++) {
+      const a = (i / this.n) * TAU;
+      const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+      const q = this.p[i];
+      q.x = q.px = x; q.y = q.py = y;
+    }
+    this.centre = { x: cx, y: cy };
+    const ab = areaBase == null ? r : areaBase;
+    this.area0 = Math.PI * ab * ab;
+    this.targetR = r;
+  }
+
+  /** Kick every particle outward (or inward) - used when the recipe changes so
+   *  the new properties are felt immediately rather than drifted into. */
+  pulse(strength) {
+    const c = this.centre;
+    for (const q of this.p) {
+      const dx = q.x - c.x, dy = q.y - c.y;
+      const d = Math.hypot(dx, dy) || 1;
+      q.px -= (dx / d) * strength;
+      q.py -= (dy / d) * strength;
+    }
+  }
+
+  /** Signed area and centroid, from the shoelace formula. */
+  measure() {
+    let a = 0, cx = 0, cy = 0;
+    const p = this.p, n = this.n;
+    for (let i = 0; i < n; i++) {
+      const q = p[i], r = p[(i + 1) % n];
+      const cross = q.x * r.y - r.x * q.y;
+      a += cross;
+      cx += (q.x + r.x) * cross;
+      cy += (q.y + r.y) * cross;
+    }
+    a *= 0.5;
+    const k = a * 6 || 1;
+    this.centre = { x: cx / k, y: cy / k };
+    return a;
+  }
+
+  step(P, bounds, grip, dt) {
+    const n = this.n, p = this.p;
+
+    // ---- integrate ----
+    for (const q of p) {
+      const vx = (q.x - q.px) * P.retention;
+      const vy = (q.y - q.py) * P.retention;
+      q.px = q.x; q.py = q.y;
+      q.x += vx;
+      q.y += vy + P.gravity;
+    }
+
+    // ---- constraints, a few passes for stability ----
+    const rest = (2 * P.restR * Math.sin(Math.PI / n));
+    for (let pass = 0; pass < 3; pass++) {
+      // perimeter springs: keep the surface from tearing or folding
+      for (let i = 0; i < n; i++) {
+        const a = p[i], b = p[(i + 1) % n];
+        let dx = b.x - a.x, dy = b.y - a.y;
+        let d = Math.hypot(dx, dy) || 1e-6;
+        const diff = (d - rest) / d * 0.5 * P.k;
+        dx *= diff; dy *= diff;
+        a.x += dx; a.y += dy;
+        b.x -= dx; b.y -= dy;
+      }
+
+      // radial springs: the shape memory that pulls it back into a blob. A fluid
+      // slime has almost none - that is the difference between slime and water, and
+      // it has to be large or every recipe handles the same.
+      this.measure();
+      const c = this.centre;
+      const shapeK = P.k * (1 - 0.72 * P.flow) * 0.55;
+      for (const q of p) {
+        let dx = q.x - c.x, dy = q.y - c.y;
+        const d = Math.hypot(dx, dy) || 1e-6;
+        const diff = (d - P.restR) / d * 0.5 * shapeK;
+        q.x -= dx * diff; q.y -= dy * diff;
+      }
+
+      // pressure: area is what makes it a jelly instead of a bag of string.
+      // Pressure pushes outward along the normal, proportional to the volume error.
+      const area = Math.abs(this.measure());
+      const err = (this.area0 * P.size * P.size - area) / (this.area0 * P.size * P.size + 1);
+      if (isFinite(err)) {
+        const c2 = this.centre;
+        for (const q of p) {
+          let dx = q.x - c2.x, dy = q.y - c2.y;
+          const d = Math.hypot(dx, dy) || 1e-6;
+          const f = err * P.pressure * 0.9;
+          q.x += (dx / d) * f;
+          q.y += (dy / d) * f;
+        }
+      }
+    }
+
+    // ---- the pointer ----
+    if (grip && grip.active) {
+      // A small grab radius, so the pointer takes hold of the nearby SURFACE and
+      // pulls it away. With a wide radius every particle is dragged toward the
+      // point, which bunches a soft slime into a ball instead of stretching it -
+      // the opposite of what a finger does to slime.
+      const R = P.restR * 0.55;
+      for (const q of p) {
+        const dx = grip.x - q.x, dy = grip.y - q.y;
+        const d = Math.hypot(dx, dy);
+        if (d < R && d > 0.5) {
+          // the pull falls off with distance, so a drag grabs the near side and
+          // stretches the far side along with it - that is the slime feel
+          const f = (1 - d / R) * 0.55 * P.grip;
+          q.x += dx * f; q.y += dy * f;
+          q.px += dx * f * 0.35; q.py += dy * f * 0.35;
+        }
+      }
+    }
+
+    // ---- bounds ----
+    for (const q of p) {
+      if (q.x < bounds.l) { q.x = bounds.l; q.px = q.x + (q.px - q.x) * -0.4; }
+      if (q.x > bounds.r) { q.x = bounds.r; q.px = q.x + (q.px - q.x) * -0.4; }
+      if (q.y > bounds.b) { q.y = bounds.b; q.py = q.y + (q.py - q.y) * -0.4; }
+      if (q.y < bounds.t) { q.y = bounds.t; q.py = q.y + (q.py - q.y) * -0.4; }
+    }
+  }
+}
+
+/* ==================================================== bubbles + sparkle */
+class Motes {
+  constructor() { this.b = []; }
+  sync(count, rnd) {
+    while (this.b.length < count) {
+      this.b.push({
+        u: rnd(), v: rnd(),           // polar coords inside the blob
+        r: 1.5 + rnd() * 3.5,
+        ph: rnd() * TAU,
+        sp: 0.4 + rnd() * 1.2,
+      });
+    }
+    while (this.b.length > count) this.b.pop();
+  }
+}
+
+/* ================================================================= view */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let VW = 0, VH = 0, DPR = 1;
+let rnd = CORE.mulberry(1337);
+
+function resize() {
+  const wrap = document.getElementById('bowlWrap');
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  VW = wrap.clientWidth; VH = wrap.clientHeight;
+  cv.width = Math.max(1, Math.floor(VW * DPR));
+  cv.height = Math.max(1, Math.floor(VH * DPR));
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  blob.reset(VW / 2, VH * 0.55, simP ? simP.restR : baseRadius(), baseRadius());
+  bounds = { l: 10, r: VW - 10, t: 10, b: VH - 10 };
+}
+window.addEventListener('resize', resize);
+
+function baseRadius() {
+  return Math.min(VW, VH) * 0.22;
+}
+
+/* ============================================================== state */
+let S = { coins: START_COINS, inv: [], made: 0, sold: 0 };
+let batch = { recipe: {}, mix: 0, dragging: false };
+let material = null;
+let simP = null;
+let grip = { active: false, x: 0, y: 0 };
+let lastPointer = { x: 0, y: 0 };
+let bounds = { l: 0, r: 0, t: 0, b: 0 };
+
+const blob = new Blob(34);
+const motes = new Motes();
+const sparks = new Motes();
+
+/* ---------------------------------------------------------- save / load */
+function save() {
+  try { localStorage.setItem(SAVE_KEY, CORE.serialise(S)); } catch (e) {}
+}
+function load() {
+  let raw = null;
+  try { raw = localStorage.getItem(SAVE_KEY); } catch (e) {}
+  if (!raw) return false;
+  const o = CORE.deserialise(raw);
+  if (!o) return false;
+  S.coins = o.coins; S.inv = o.inv; S.made = o.made; S.sold = o.sold;
+  return true;
+}
+
+/* --------------------------------------------------------------- refresh */
+function refresh(animate) {
+  material = CORE.materialFromRecipe(batch.recipe, batch.mix);
+  simP = CORE.simParams(material, baseRadius());
+  blob.targetR = simP.restR;
+  // area0 is the area at size 1.0. The pressure term multiplies by size^2 itself.
+  blob.area0 = Math.PI * baseRadius() * baseRadius();
+  motes.sync(simP.bubbles, rnd);
+  sparks.sync(batch.recipe.glitter > 0 ? Math.min(28, batch.recipe.glitter * 7) : 0, rnd);
+  document.getElementById('behaviour').textContent = CORE.describeMaterial(material);
+  renderMix();
+  renderMaterial();
+  renderStats();
+  if (animate) blob.pulse(3.5);
+}
+
+/* --------------------------------------------------------------- render */
+function fmt(v, d) { return v.toFixed(d == null ? 2 : d); }
+
+function renderMix() {
+  const pct = Math.round(batch.mix * 100);
+  document.getElementById('mix-fill').style.width = pct + '%';
+  document.getElementById('mixPct').textContent = pct + '%';
+}
+
+function renderMaterial() {
+  const box = document.getElementById('matBars');
+  box.innerHTML = CORE.MATERIALS.map(m => {
+    const lo = CORE.RANGES[m][0], hi = CORE.RANGES[m][1];
+    const pc = Math.max(0, Math.min(100, ((material[m] - lo) / (hi - lo)) * 100));
+    return `<div class="bar mat"><span class="t">${CORE.MATERIAL_LABEL[m]}</span>` +
+      `<span class="g"><i style="width:${pc}%"></i></span>` +
+      `<span class="v">${fmt(material[m], m === 'damping' ? 3 : 2)}</span></div>`;
+  }).join('');
+  document.getElementById('matTag').textContent = CORE.describeMaterial(material);
+}
+
+function renderStats() {
+  const st = CORE.computeStats(batch.recipe, batch.mix);
+  const box = document.getElementById('statBars');
+  box.innerHTML = CORE.STATS.map(s => {
+    const pc = Math.min(100, ((st[s] || 0) / 5.5) * 100);
+    return `<div class="bar sell"><span class="t">${CORE.STAT_LABEL[s]}</span>` +
+      `<span class="g"><i style="width:${pc}%"></i></span>` +
+      `<span class="v">${fmt(st[s] || 0, 1)}</span></div>`;
+  }).join('');
+  const n = Object.keys(batch.recipe).filter(k => batch.recipe[k] > 0).length;
+  const name = n ? CORE.nameFromRecipe(batch.recipe, st) : 'Empty Blob';
+  document.getElementById('nameTag').textContent = name;
+  const v = valueOfBatch(st);
+  document.getElementById('value').innerHTML = n
+    ? `worth <b style="color:var(--gold)">&#9672; ${v}</b>` +
+      (batch.mix < 0.99 ? ` &nbsp;<span style="color:var(--bad)">unmixed — keeps only ${Math.round(CORE.mixQuality(batch.mix) * 100)}%</span>` : '')
+    : 'Add an ingredient to begin.';
+  return st;
+}
+
+function distinct() {
+  return Math.max(1, Object.keys(batch.recipe).filter(k => batch.recipe[k] > 0).length);
+}
+function valueOfBatch(st) {
+  return CORE.valueOf(st || CORE.computeStats(batch.recipe, batch.mix), { distinct: distinct() });
+}
+
+function renderIngredients() {
+  const box = document.getElementById('ingredients');
+  box.innerHTML = CORE.INGREDIENT_ORDER.map(key => {
+    const ing = CORE.INGREDIENTS[key];
+    const poor = S.coins < ing.cost;
+    const n = batch.recipe[key] || 0;
+    return `<button class="ing" data-k="${key}">` +
+      `<span class="em">${ing.emoji}</span>` +
+      `<span class="nm">${ing.name}${n ? ' \u00d7' + n : ''}</span>` +
+      `<span class="ct${poor ? ' poor' : ''}">&#9672; ${ing.cost}</span></button>`;
+  }).join('');
+  box.querySelectorAll('button').forEach(b =>
+    b.addEventListener('click', () => addIngredient(b.dataset.k)));
+}
+
+let noteT = null;
+function note(text, kind) {
+  const box = document.getElementById('value');
+  const col = kind === 'no' ? 'var(--bad)' : kind === 'warn' ? 'var(--gold)' : 'var(--dim)';
+  box.innerHTML = `<span style="color:${col}">${text}</span>`;
+  clearTimeout(noteT);
+  noteT = setTimeout(() => renderStats(), 1900);
+}
+
+/* ----------------------------------------------------------- interaction */
+function addIngredient(key) {
+  const ing = CORE.INGREDIENTS[key];
+  if (S.coins < ing.cost) { note('Not enough coins for ' + ing.name + '.', 'no'); return; }
+  S.coins -= ing.cost;
+  document.getElementById('coins').textContent = '\u25c8 ' + S.coins.toLocaleString();
+  batch.recipe[key] = (batch.recipe[key] || 0) + 1;
+  batch.mix = Math.max(0, batch.mix * 0.55);   // each addition has to be worked in
+  save();
+  refresh(true);
+  renderIngredients();
+  note(ing.note, 'warn');
+}
+
+function resetBatch(silent) {
+  batch = { recipe: {}, mix: 0, dragging: false };
+  refresh(true);
+  renderIngredients();
+  if (!silent) note('Batch dumped.', 'warn');
+}
+
+function saveSlime() {
+  const st = CORE.computeStats(batch.recipe, batch.mix);
+  if (!Object.keys(batch.recipe).some(k => batch.recipe[k] > 0)) {
+    note('Mix something first.', 'no'); return;
+  }
+  if (CORE.activation(batch.recipe) < 0.4) {
+    note('That batch never set \u2014 add borax.', 'no'); return;
+  }
+  const v = valueOfBatch(st);
+  if (v <= 0) { note('That batch is worth nothing.', 'no'); return; }
+  const col = CORE.computeColour(batch.recipe);
+  S.inv.push({
+    name: CORE.nameFromRecipe(batch.recipe, st),
+    stats: st,
+    colour: `rgb(${col.join(',')})`,
+    recipe: Object.assign({}, batch.recipe),
+    mix: Math.round(batch.mix * 100),
+    value: v,
+    material: {
+      stiffness: material.stiffness, damping: material.damping,
+      pressure: material.pressure, density: material.density,
+      size: material.size, flow: material.flow, aeration: material.aeration,
+    },
+  });
+  S.made++;
+  save();
+  resetBatch(true);
+  renderInventory();
+  go('trade');
+  note('Saved ' + S.inv[S.inv.length - 1].name + '.', 'ok');
+}
+
+/* ---------------------------------------------------------------- trading */
+let selInv = null, selTrader = null, counters = 0, offer = 0;
+
+function distinctOf(s) {
+  if (!s || !s.recipe) return 1;
+  return Math.max(1, Object.keys(s.recipe).filter(k => s.recipe[k] > 0).length);
+}
+
+function renderTraders() {
+  const box = document.getElementById('traders');
+  const st = selInv != null ? S.inv[selInv].stats : null;
+  box.innerHTML = CORE.TRADERS.map(t => {
+    const o = st ? CORE.traderOffer(t, st, distinctOf(S.inv[selInv])) : null;
+    const top = CORE.STATS.slice().sort((a, b) => t.wants[b] - t.wants[a])[0];
+    return `<div class="trader${selTrader === t ? ' on' : ''}" data-t="${t.id}">` +
+      `<div class="av" style="background:${avatar(t.id)}">${t.name[0]}</div>` +
+      `<div><div class="nm">${t.name}</div><div class="bl">${t.blurb}</div>` +
+      `<div class="bl" style="color:var(--acc)">pays for ${CORE.STAT_LABEL[top]}</div></div>` +
+      `<div class="of"><div class="c">${o ? '\u25c8 ' + o.coins : '\u2014'}</div>` +
+      `<div class="s">${o ? 'offered' : 'pick a slime'}</div></div></div>`;
+  }).join('');
+  box.querySelectorAll('.trader').forEach(d =>
+    d.addEventListener('click', () => pickTrader(d.dataset.t)));
+}
+function avatar(id) {
+  const i = CORE.TRADERS.findIndex(t => t.id === id);
+  return ['#ffcc55', '#5aa9ff', '#22c98a', '#ff9ecd'][i % 4];
+}
+
+function renderInventory() {
+  const box = document.getElementById('inv');
+  const empty = document.getElementById('invEmpty');
+  if (!S.inv.length) { box.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  box.innerHTML = S.inv.map((s, i) =>
+    `<div class="chip${selInv === i ? ' on' : ''}" data-i="${i}">` +
+    `<div class="dot" style="background:${s.colour}"></div>` +
+    `<div class="nm">${s.name}</div><div class="vl">\u25c8 ${s.value}</div></div>`).join('');
+  box.querySelectorAll('.chip').forEach(c =>
+    c.addEventListener('click', () => pickSlime(+c.dataset.i)));
+}
+
+function pickSlime(i) { selInv = i; selTrader = null; counters = 0; offer = 0; renderInventory(); renderTraders(); renderDeal(); }
+
+function pickTrader(id) {
+  if (selInv == null) { setMsg('Pick one of your slimes first.', 'warn'); return; }
+  const t = CORE.TRADERS.find(x => x.id === id);
+  if (!t) return;
+  selTrader = t; counters = t.patience;
+  offer = CORE.traderOffer(t, S.inv[selInv].stats, distinctOf(S.inv[selInv])).coins;
+  renderTraders(); renderDeal();
+}
+
+function renderDeal() {
+  const card = document.getElementById('dealCard');
+  if (selInv == null) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  const s = S.inv[selInv];
+  const fair = CORE.valueOf(s.stats, { distinct: distinctOf(s) });
+  document.getElementById('myBlob').style.background = s.colour;
+  document.getElementById('myName').textContent = s.name;
+  document.getElementById('myVal').innerHTML = '\u25c8 ' + fair +
+    (s.mix < 99 ? ` <span style="color:var(--dim)">\u00b7${s.mix}%</span>` : '');
+  const a = document.getElementById('acceptBtn'), c = document.getElementById('counterBtn'),
+        d = document.getElementById('declineBtn');
+  if (!selTrader) {
+    document.getElementById('theirBlob').style.background = 'var(--panel2)';
+    document.getElementById('theirName').textContent = '\u2014';
+    document.getElementById('theirVal').textContent = '\u2014';
+    document.getElementById('theirLbl').textContent = 'They pay';
+    a.disabled = c.disabled = d.disabled = true;
+    setMsg('Now choose who to sell to.'); return;
+  }
+  document.getElementById('theirLbl').textContent = selTrader.name + ' pays';
+  document.getElementById('theirBlob').style.background = avatar(selTrader.id);
+  document.getElementById('theirName').textContent = 'coins';
+  const prem = fair > 0 ? offer / fair : 0;
+  document.getElementById('theirVal').innerHTML = '\u25c8 ' + offer +
+    (prem > 1.15 ? ` <span style="color:var(--good)">+${Math.round((prem - 1) * 100)}%</span>`
+     : prem < 0.85 ? ` <span style="color:var(--bad)">low</span>` : '');
+  a.disabled = false; c.disabled = counters <= 0; d.disabled = false;
+  if (prem > 1.25) setMsg(`${selTrader.name} really wants this one.`, 'ok');
+  else if (prem < 0.8) setMsg(`${selTrader.name} shrugs \u2014 not their thing.`, 'warn');
+  else setMsg(`${selTrader.name} offers \u25c8 ${offer}. Counters left: ${counters}.`);
+}
+
+function setMsg(t, k) { const m = document.getElementById('msg'); m.textContent = t; m.className = k || ''; }
+
+function doAccept() {
+  if (selInv == null || !selTrader) return;
+  const s = S.inv.splice(selInv, 1)[0];
+  S.coins += offer; S.sold++;
+  save(); selInv = null; selTrader = null; offer = 0;
+  document.getElementById('coins').textContent = '\u25c8 ' + S.coins.toLocaleString();
+  renderInventory(); renderTraders();
+  document.getElementById('dealCard').style.display = 'none';
+  setMsg(`Sold ${s.name} for \u25c8 ${offer}.`, 'ok');
+}
+
+function doCounter() {
+  if (selInv == null || !selTrader) return;
+  const s = S.inv[selInv];
+  const ask = Math.round(offer * 1.25 / 5) * 5;
+  if (CORE.acceptsCounter(selTrader, s.stats, ask, counters, distinctOf(s))) {
+    offer = ask; counters--;
+    setMsg(`${selTrader.name} accepts \u25c8 ${ask}. Take it?`, 'ok');
+  } else {
+    counters = 0;
+    offer = Math.round(offer * 0.80 / 5) * 5;
+    setMsg(`${selTrader.name} refuses and drops it to \u25c8 ${offer}.`, 'no');
+  }
+  renderDeal();
+}
+
+function doDecline() {
+  if (selInv != null && selTrader) setMsg(`You walk away from ${selTrader.name}.`, 'warn');
+  selTrader = null; offer = 0; renderTraders();
+  document.getElementById('dealCard').style.display = 'none';
+}
+
+/* ------------------------------------------------------------------- tabs */
+function go(t) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('on'));
+  document.getElementById('tab-' + t).classList.add('active');
+  document.getElementById('nav-' + t).classList.add('on');
+  document.getElementById('subtitle').textContent = t === 'lab' ? 'mix a batch' : 'sell it well';
+  if (t === 'lab') setTimeout(resize, 0);
+  if (t === 'trade') { renderInventory(); renderTraders(); renderDeal(); }
+}
+
+/* ------------------------------------------------------------- the loop */
+function draw() {
+  ctx.clearRect(0, 0, VW, VH);
+
+  // bowl floor and walls, so the blob has something to sit on
+  const g = ctx.createLinearGradient(0, 0, 0, VH);
+  g.addColorStop(0, '#0a0d11');
+  g.addColorStop(1, '#12171e');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, VW, VH);
+  ctx.strokeStyle = 'rgba(90,169,255,.07)';
+  ctx.lineWidth = 1;
+  for (let y = VH - 10; y > 0; y -= 26) {
+    ctx.beginPath(); ctx.moveTo(10, y); ctx.lineTo(VW - 10, y); ctx.stroke();
+  }
+
+  const p = blob.p;
+  // smooth closed curve through the particles
+  ctx.beginPath();
+  const N = blob.n;
+  ctx.moveTo((p[0].x + p[N - 1].x) / 2, (p[0].y + p[N - 1].y) / 2);
+  for (let i = 0; i < N; i++) {
+    const a = p[i], b = p[(i + 1) % N];
+    ctx.quadraticCurveTo(a.x, a.y, (a.x + b.x) / 2, (a.y + b.y) / 2);
+  }
+  ctx.closePath();
+
+  const col = CORE.computeColour(batch.recipe);
+  const base = `rgb(${col.join(',')})`;
+  const lit = `rgb(${col.map(v => Math.min(255, v + 46)).join(',')})`;
+  const dark = `rgb(${col.map(v => Math.round(v * 0.55)).join(',')})`;
+
+  const grd = ctx.createRadialGradient(
+    blob.centre.x - simP.restR * 0.35, blob.centre.y - simP.restR * 0.45, simP.restR * 0.15,
+    blob.centre.x, blob.centre.y, simP.restR * 1.5);
+  grd.addColorStop(0, lit);
+  grd.addColorStop(0.55, base);
+  grd.addColorStop(1, dark);
+  ctx.fillStyle = grd;
+  ctx.shadowColor = 'rgba(0,0,0,.55)';
+  ctx.shadowBlur = 24;
+  ctx.shadowOffsetY = 8;
+  ctx.fill();
+  ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+  // rim, brighter when it is wet and glossy
+  ctx.strokeStyle = `rgba(255,255,255,${(0.10 + material.shine / 26).toFixed(2)})`;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // bubbles: foam from soap, floating inside the body
+  ctx.save();
+  ctx.clip();
+  for (const b of motes.b) {
+    const t = performance.now() / 1000 * b.sp + b.ph;
+    const rr = simP.restR * 0.72 * b.u;
+    const x = blob.centre.x + Math.cos(b.ph * 6.28) * rr + Math.sin(t) * 4;
+    const y = blob.centre.y + Math.sin(b.ph * 6.28) * rr * 0.8 + Math.cos(t * 0.8) * 4;
+    ctx.beginPath();
+    ctx.arc(x, y, b.r, 0, TAU);
+    ctx.fillStyle = 'rgba(255,255,255,.30)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.35)';
+    ctx.stroke();
+  }
+  // sparkle: glitter, twinkling
+  for (const s of sparks.b) {
+    const t = performance.now() / 1000 * s.sp * 2 + s.ph;
+    const rr = simP.restR * 0.8 * s.u;
+    const x = blob.centre.x + Math.cos(s.ph * 6.28) * rr;
+    const y = blob.centre.y + Math.sin(s.ph * 6.28) * rr;
+    const a = 0.35 + 0.65 * Math.abs(Math.sin(t));
+    ctx.fillStyle = `rgba(255,238,170,${a.toFixed(2)})`;
+    ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
+  }
+  // a wet highlight
+  ctx.beginPath();
+  ctx.ellipse(blob.centre.x - simP.restR * 0.32, blob.centre.y - simP.restR * 0.42,
+              simP.restR * 0.30, simP.restR * 0.20, -0.5, 0, TAU);
+  ctx.fillStyle = `rgba(255,255,255,${(0.10 + material.shine / 22).toFixed(2)})`;
+  ctx.fill();
+  ctx.restore();
+}
+
+let last = performance.now();
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(50, now - last);
+  last = now;
+  if (!simP) return;
+
+  // a fixed step keeps the simulation stable regardless of refresh rate
+  const steps = Math.max(1, Math.min(3, Math.round(dt / 16)));
+  for (let i = 0; i < steps; i++) blob.step(simP, bounds, grip, 16);
+
+  draw();
+}
+
+/* --------------------------------------------------------------- pointer */
+function pointerPos(e) {
+  const r = cv.getBoundingClientRect();
+  const t = e.touches ? e.touches[0] : e;
+  return { x: t.clientX - r.left, y: t.clientY - r.top };
+}
+
+function onDown(e) {
+  if (e.preventDefault) e.preventDefault();
+  const q = pointerPos(e);
+  grip.active = true; grip.x = q.x; grip.y = q.y;
+  lastPointer = q;
+  batch.dragging = true;
+}
+function onMove(e) {
+  if (!batch.dragging) return;
+  if (e.preventDefault) e.preventDefault();
+  const q = pointerPos(e);
+  grip.x = q.x; grip.y = q.y;
+  const dist = Math.hypot(q.x - lastPointer.x, q.y - lastPointer.y);
+  lastPointer = q;
+  if (dist < 1) return;
+
+  // How hard it is to work depends on the material: a batch with no borax barely
+  // moves at all, and an over-set one fights you. The drag distance that counts is
+  // scaled by how fluid the slime currently is.
+  const work = (dist / 620) * (0.35 + 0.65 * material.flow + 0.25 * (1 - material.stiffness));
+  batch.mix = Math.min(1, batch.mix + work);
+  // mixing changes the material, which changes how it mixes - recompute live
+  material = CORE.materialFromRecipe(batch.recipe, batch.mix);
+  simP = CORE.simParams(material, baseRadius());
+  renderMix();
+  renderMaterial();
+  renderStats();
+}
+function onUp() {
+  if (!batch.dragging) return;
+  batch.dragging = false;
+  grip.active = false;
+  save();
+}
+
+/* ------------------------------------------------------------------ boot */
+function boot() {
+  load();
+  document.getElementById('coins').textContent = '\u25c8 ' + S.coins.toLocaleString();
+  renderIngredients();
+  renderInventory();
+  resize();
+  refresh(false);
+  blob.reset(VW / 2, VH * 0.5, simP.restR, baseRadius());
+
+  cv.addEventListener('mousedown', onDown);
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+  cv.addEventListener('touchstart', onDown, { passive: false });
+  cv.addEventListener('touchmove', onMove, { passive: false });
+  window.addEventListener('touchend', onUp);
+
+  document.getElementById('nav-lab').addEventListener('click', () => go('lab'));
+  document.getElementById('nav-trade').addEventListener('click', () => go('trade'));
+  document.getElementById('saveBtn').addEventListener('click', saveSlime);
+  document.getElementById('resetBtn').addEventListener('click', () => resetBatch(false));
+  document.getElementById('acceptBtn').addEventListener('click', doAccept);
+  document.getElementById('counterBtn').addEventListener('click', doCounter);
+  document.getElementById('declineBtn').addEventListener('click', doDecline);
+
+  requestAnimationFrame(loop);
+  if (!S.inv.length && S.made === 0) {
+    note('Buy glue \u25c86 and borax \u25c89, then drag to mix.', 'warn');
+  }
+}
+boot();
+</script>
+</body>
+</html>

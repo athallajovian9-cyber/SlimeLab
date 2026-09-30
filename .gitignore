@@ -1,0 +1,12 @@
+# build output - the exe and the zip are release assets, not source
+build/
+dist/
+release/
+*.spec
+*.zip
+*.exe
+
+# scratch
+_probe.js
+_g.js
+_m.js
